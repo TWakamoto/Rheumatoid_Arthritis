@@ -28,11 +28,11 @@ class Model():
     gamma2: float = 1.0
 
     beta1: float = 0.1
-    beta2_1: float = 30.0
-    beta2_2: float = 30.0
+    beta2_1: float = 8.0
+    beta2_2: float = 5.0
     beta3: float = 2.0
-    beta4_1: float = 8.0
-    beta4_2: float = 8.0
+    beta4_1: float = 10.0
+    beta4_2: float = 10.0
 
     nu0: float = 0.5
     nu1: float = 5.0
@@ -154,11 +154,11 @@ class Model():
 # %% set up pytorch==========
 
 dtype = torch.float32
-device = torch.device("cuda")
+device = torch.device("cpu")
 # %%=============================================
 # simulation without treatment
 
-T = 300.0 #最終時
+T = 200.0 #最終時
 model = Model(n_grid=11, e = 0.01, device=device)
 y_init = model.random_init()
 
@@ -262,7 +262,7 @@ sol = odeint( model, y_init, t, atol=atol, rtol=rtol, method="bosh3", options= d
 # get color map of HES-1 (animation)
 sol_H1 = get_H1(sol, 10)
 sol_H1anim = sol_H1.to('cpu').detach().numpy().copy()
-plot_animation(t_anim, sol_H1anim[:, 1:-1, 1:-1], "test_h_lc.gif")
+plot_animation(t_anim, sol_H1anim[:, 1:-1, 1:-1], "test_beta-1d_lc.gif")
 
 # %%=======================================================================================================
 # get color map of protein (or gene) A (animation)
@@ -318,7 +318,7 @@ def plot_graph(t, sol_component, fn):
 # %%================================================================================================================
 # animation
 # x_axis: cell position, y_axis: level of protein or gene
-plot_graph(t_anim, sol_[:, 10, :, 1:-1], "test_graph_h_lc.gif")
+plot_graph(t_anim, sol_[:, 10, :, 1:-1], "beta4-10_graph_h_lc.gif")
 
 # %%===================================================================================================
 # figure (except for cancer cell)
