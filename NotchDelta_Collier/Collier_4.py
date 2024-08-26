@@ -6,12 +6,12 @@ Created on Wed Oct 12 10:58:46 2022
 @author: tamaki
 """
 
-#境界条件０
+#ライブラリのインポート
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import animation
 
-N = 900 #刻み数
+N = 900 #時間の刻み数
 T = 30 #最終時刻
 s = T/N #時間の刻み幅
 ver = 9 #細胞の数（たて）
@@ -33,23 +33,21 @@ a = 0.01
 b = 100.0
 
 #関数定義
-def n_ij(z,ave): #d(n_ij)/dt
-    return (ave ** k)/(a + (ave ** k)) - z
-def d_ij(z,notch): #d(d_ij)/dt
-    return v*(1/(1 + b * (notch ** h)) - z)
+def n_ij(n,d): #d(n_ij)/dt
+    return (d ** k)/(a + (d ** k)) - n
+def d_ij(d,n): #d(d_ij)/dt
+    return v*(1/(1 + b * (n ** h)) - d)
 
 #初期値
-n_0 = np.random.rand(ver, wid)
-d_0 = np.random.rand(ver, wid)
-n[1:-1, 1:-1] = n_0
-d[1:-1, 1:-1] = d_0
+n[1:-1, 1:-1] = np.random.rand(ver, wid)
+d[1:-1, 1:-1] = np.random.rand(ver, wid)
 #アニメーションの準備
 fig1 = plt.figure(figsize=(10, 8))
 ax1 = fig1.add_subplot(111)
 ax1.set_xticks([])
 ax1.set_yticks([])
 ims1 = []
-im11 = plt.imshow(n[1:-1, 1:-1], interpolation='nearest', animated=True, vmin=0, vmax=1, cmap='jet')
+im11 = plt.imshow(d[1:-1, 1:-1], interpolation='nearest', animated=True, vmin=0, vmax=1, cmap='jet')
 im12 = fig1.colorbar(im11, ax=ax1)
 txt11 = ax1.text(0.1, -0.03, f't={t[0]:.2f}', transform=ax1.transAxes)
 ims1.append([im11]+[txt11])
@@ -72,7 +70,7 @@ for l in range(0, N-1):
     n[1:-1, 1:-1] = n_new[1:-1, 1:-1]
     d[1:-1, 1:-1] = d_new[1:-1, 1:-1]
     if (l+1)%ITVL == 0:
-        im11 = plt.imshow(n[1:-1, 1:-1], interpolation='nearest', vmin=0, vmax=1, animated=True, cmap='jet')
+        im11 = plt.imshow(d[1:-1, 1:-1], interpolation='nearest', vmin=0, vmax=1, animated=True, cmap='jet')
         txt11 = ax1.text(0.1, -0.03, f't={t[l+1]:.2f}', transform=ax1.transAxes)
         ims1.append([im11]+[txt11])
 
