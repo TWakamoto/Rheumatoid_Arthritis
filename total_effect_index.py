@@ -393,20 +393,20 @@ for j in range(2):
             A_i[k0, p] = (1/Ns)*np.sum(y[k0, :]*np.cos((p+1)*s1))
             B_i[k0, p] = (1/Ns)*np.sum(y[k0, :]*np.sin((p+1)*s1))
         V_i[k0, j] = 2*np.sum((A_i[k0, :]**2)+(B_i[k0, :]**2))
-        V_total[k0, j] = 2*(np.sum(A_total[k0, :]**2)+np.sum(B_total[k0, :]**2))
+        V_total[k0, j] = 2*(np.sum((A_total[k0, :]**2) + (B_total[k0, :]**2)))
     for i in range(param):
-        for j in range(Ns):
-            Nm1[i, j, 1:-1 ,1:-1] = y_init[0, :, :]
-            Nm2[i, j, 1:-1 ,1:-1] = y_init[1, :, :]
-            Dm1[i, j, 1:-1 ,1:-1] = y_init[2, :, :]
-            Dm2[i, j, 1:-1 ,1:-1] = y_init[3, :, :]
-            Nc1[i, j, 1:-1 ,1:-1] = y_init[4, :, :]
-            Nc2[i, j, 1:-1 ,1:-1] = y_init[5, :, :]
-            Dc1[i, j, 1:-1 ,1:-1] = y_init[6, :, :]
-            Dc2[i, j, 1:-1 ,1:-1] = y_init[7, :, :]
-            I1[i, j, 1:-1 ,1:-1] = y_init[8, :, :]
-            I2[i, j, 1:-1 ,1:-1] = y_init[9, :, :]
-            H1[i, j, 1:-1 ,1:-1] = y_init[10, :, :]
+        for k in range(Ns):
+            Nm1[i, k, 1:-1 ,1:-1] = y_init[0, :, :]
+            Nm2[i, k, 1:-1 ,1:-1] = y_init[1, :, :]
+            Dm1[i, k, 1:-1 ,1:-1] = y_init[2, :, :]
+            Dm2[i, k, 1:-1 ,1:-1] = y_init[3, :, :]
+            Nc1[i, k, 1:-1 ,1:-1] = y_init[4, :, :]
+            Nc2[i, k, 1:-1 ,1:-1] = y_init[5, :, :]
+            Dc1[i, k, 1:-1 ,1:-1] = y_init[6, :, :]
+            Dc2[i, k, 1:-1 ,1:-1] = y_init[7, :, :]
+            I1[i, k, 1:-1 ,1:-1] = y_init[8, :, :]
+            I2[i, k, 1:-1 ,1:-1] = y_init[9, :, :]
+            H1[i, k, 1:-1 ,1:-1] = y_init[10, :, :]
 # %%
 Si_bt = 1 - ((1/2)*(V_i[:, 0]+V_i[:, 1])/((1/2)*(V_total[:, 0]+V_total[:,1])))
 print(Si_bt)
