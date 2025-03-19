@@ -9,7 +9,7 @@ using ParallelStencil
 @init_parallel_stencil(Threads, Float64, 2) #for CPU
 
 #=======================RA=======================#
-Lx = 60+1 #number of cells along x_axis
+Lx = 60 #number of cells along x_axis
 Ly = 30 #number of cells along y-axis
 
 T_end = 50
@@ -96,79 +96,108 @@ function notch_func!(du, u, p, t)
 end
 
 #=======================SIMULATION=======================#
-#-------------------cell density-------------------
+#cell density
 σs = zeros(Ly, Lx)
 σ = Array(collect(0:1:Lx-1))
 a = 1.0
-b = 30.0
+b = 0.0
 c = 15.0
-
 #non-linear
 for i in 1:Ly
     #left
     σs[i, :] .= a*exp.(-((σ.-b).^2)/(2*c*c))
 end
 
-#linear
-#for i in 1:Ly
-#    σs[i, :] = -σ./(Lx+1) .+ 1
-#end
-
-#σs=1.0
-
-
-begin
-    #timespan, parameters------------------------------------------------
-    tspan = (0.0, T_end)
-
-    cache = (
-        n_ave = zeros(Ly,Lx),
-        d_ave = zeros(Ly,Lx),
-        j_ave = zeros(Ly, Lx),
-    )
-    p = (
-        α1=1.0, α2=1.0, μ1=1.0, μ2=1.0, μ3=1.0, μ4=0.01, μ5=1.0, μ6=0.5, μ7=0.5,
-        β1=1.1, β2=20.0, β3=100.0, β4=1.0, β5=1.1, β6=1.0,
-        γ1=2.0, γ2=1.0,γ3=1.0,
-        σs=σs, σv=1.0, cache...
+α2 = Array(1.0:-0.1:0)
+β6 = Array(1.0:-0.1:0)
+γ3 = Array(1.0:-0.1:0)
+y = zeros(3, 11, 10)
+for q in 1:10
+    begin
+        #initial data--------------------------------------------------------
+        u0 = rand(Ly, Lx, 7)*0.1
+        @. u0[:, :, 2] = u0[:, :, 2] + 3.0 #DELTA in cell membrane
+        @. u0[:, :, 6] = u0[:, :, 6] + 3.0 #DELTA in cytosol
+        @. u0[:, :, 4] = u0[:, :, 4] + 0.5 #NICD in cytosol
+        #timespan, parameters------------------------------------------------
+        tspan = (0.0, T_end)
+        
+        cache = (
+            n_ave = zeros(Ly,Lx),
+            d_ave = zeros(Ly,Lx),
+            j_ave = zeros(Ly, Lx),
         )
+    end
     
-    #initial data--------------------------------------------------------
-    u0 = rand(Ly, Lx, 7)*0.1 #cell number (y), cell number (x), biochemicals
-    @. u0[:, :, 2] = u0[:, :, 2] + 3.0 #DELTA in cell membrane
-    @. u0[:, :, 6] = u0[:, :, 6] + 3.0 #DELTA in cytosol
-    @. u0[:, :, 4] = u0[:, :, 4] + 0.5 #NICD in cytosol
-
-    prob = ODEProblem(notch_func!, u0, tspan, p)
+    for param in 1:11
+        begin
+            p = (
+                α1=1.0, α2=α2[param], μ1=1.0, μ2=1.0, μ3=1.0, μ4=0.01, μ5=1.0, μ6=0.5, μ7=0.5,
+                β1=1.1, β2=20.0, β3=100.0, β4=1.0, β5=1.1, β6=1.0,
+                γ1=2.0, γ2=1.0,γ3=1.0,
+                σs=σs, σv=1.0, cache...
+                )
+            prob = ODEProblem(notch_func!, u0, tspan, p)
+        end
+        #calculation
+        @time sol = solve(prob, Heun(), progress = true, progress_steps = 1.0, saveat=[T_end], callback=TerminateSteadyState(5e-3));
+        #calculation methods: BS3, Tsit5, Heun, ROCK2
+        y[1, param, q] = maximum(sol[end][15, 3:end-1 ,5] .- sol[end][15, 4:end ,5])
+    end
+    for param in 1:11
+        begin
+            p = (
+                α1=1.0, α2=1.0, μ1=1.0, μ2=1.0, μ3=0.01, μ4=1.0, μ5=0.5, μ6=1.0, μ7=0.5,
+                β1=1.1, β2=20.0, β3=100.0, β4=1.0, β5=1.1, β6=β6[param],
+                γ1=2.0, γ2=1.0,γ3=1.0,
+                σs=σs, σv=1.0, cache...
+                )
+            prob = ODEProblem(notch_func!, u0, tspan, p)
+        end
+        #calculation
+        @time sol = solve(prob, Heun(), progress = true, progress_steps = 1.0, saveat=[T_end], callback=TerminateSteadyState(5e-3));
+        #calculation methods: BS3, Tsit5, Heun, ROCK2
+        y[2, param, q] = maximum(sol[end][15, 3:end-1 ,5] .- sol[end][15, 4:end ,5])
+    end
+    for param in 1:11
+        begin
+            p = (
+                α1=1.0, α2=1.0, μ1=1.0, μ2=1.0, μ3=0.01, μ4=1.0, μ5=0.5, μ6=1.0, μ7=0.5,
+                β1=1.1, β2=20.0, β3=100.0, β4=1.0, β5=1.1, β6=1.0,
+                γ1=2.0, γ2=1.0,γ3=γ3[param],
+                σs=σs, σv=1.0, cache...
+                )
+            prob = ODEProblem(notch_func!, u0, tspan, p)
+        end
+        #calculation
+        @time sol = solve(prob, Heun(), progress = true, progress_steps = 1.0, saveat=[T_end], callback=TerminateSteadyState(5e-3));
+        #calculation methods: BS3, Tsit5, Heun, ROCK2
+        y[3, param, q] = maximum(sol[end][15, 3:end-1 ,5] .- sol[end][15, 4:end ,5])
+    end
 end
 
-#------------------Animation------------------
-function plot_heatmap(u, t, integrator)
-    heatmap(Array(u[:, :, 5]), title="t=$(round(t, digits=1))", c=:inferno, clim=(0, 7))
-    frame(anim)
-    return nothing
+mean_a = zeros(11)
+mean_b = zeros(11)
+mean_g = zeros(11)
+std_a  = zeros(11)
+std_b  = zeros(11)
+std_g  = zeros(11)
+for param in 1:11
+    mean_a[param] = sum(y[1, param, :])/10
+    mean_b[param] = sum(y[2, param, :])/10
+    mean_g[param] = sum(y[3, param, :])/10
+    std_a[param]  = sqrt(sum((mean_a[param].-y[1, param, :]).^2)/10)
+    std_b[param]  = sqrt(sum((mean_b[param].-y[2, param, :]).^2)/10)
+    std_g[param]  = sqrt(sum((mean_g[param].-y[3, param, :]).^2)/10)
 end
-anim = Animation() #array of image for animation
-
-#--------------callback functions--------------
-cb1 = FunctionCallingCallback(plot_heatmap, funcat = LinRange(0, T_end, 100)) #plot at intervals
-cb2 = TerminateSteadyState(5e-3) #If all biochemicals in cells reach steady state, terminate the simulation
-cbs = CallbackSet(cb1, cb2)
 
 
-#-------------------calculation-------------------
-@time sol = solve(prob, Heun(), progress = true, progress_steps = 1.0, saveat=[T_end], callback=cbs);
-#calculation methods: BS3, Tsit5, Heun, ROCK2
+fig1 = plot(α2, mean_a, yerror=std_a, label="alpha_2")
+plot!(γ3, mean_g, yerror=std_g, label="gamma_3")
+plot!(β6, mean_b, yerror=std_b, label="beta_6")
+savefig(fig1, "plot_SteepRate.png")
 
-#----------------plot and save figure----------------
-#heatmap at t=T_end
-fig1 = heatmap(Array(sol[end][:, :, 5]), title="Notch in cytosol",  c=:inferno, clim=(0, 7))
-fig2 = heatmap(Array(sol[end][:, :, 6]), title="Delta in cytosol",  c=:inferno, clim=(0, 0.1))
-fig3 = heatmap(Array(sol[end][:, :, 7]), title="Jagged in cytosol", c=:inferno, clim=(0, 0.7))
-
-#save figure
-savefig(fig1, "_notch.png")
-savefig(fig2, "_Delta.png")
-savefig(fig3, "_Jag.png")
-gif(anim,     "_notch.gif", fps=120) #create gif animation
-
+fig2 = plot(α2, mean_a, label="alpha_2")
+plot!(γ3, mean_g, label="gamma_3")
+plot!(β6, mean_b, yerror=std_b, label="beta_6")
+savefig(fig2, "plot_SteepRate_b.png")

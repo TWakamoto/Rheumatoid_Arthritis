@@ -9,7 +9,7 @@ using ParallelStencil
 @init_parallel_stencil(Threads, Float64, 2) #for CPU
 
 #=======================RA=======================#
-Lx = 60+1 #number of cells along x_axis
+Lx = 60 #number of cells along x_axis
 Ly = 30 #number of cells along y-axis
 
 T_end = 50
@@ -21,7 +21,7 @@ function notch_func!(du, u, p, t)
         α1, α2, μ1, μ2, μ3, μ4, μ5, μ6, μ7,
         β1, β2, β3, β4, β5, β6,
         γ1, γ2, γ3,
-        σs, σv,
+        σs, σv, ν0, ν1, ν2, k,
         n_ave, d_ave, j_ave,
     ) = p
 #area except for boundary
@@ -37,6 +37,12 @@ function notch_func!(du, u, p, t)
     @views Dc = u[:, :, 6]
     @views Jc = u[:, :, 7]
     
+
+#cell density related to Notch expression
+    @. σs = ν0 + ν2*(Nc^k)/(ν1^k+(Nc^k))
+    @. σs[:, 2] = 0.5
+
+
 
 #mean of Notch/Delta in surrounding cells
     @views begin
@@ -96,30 +102,26 @@ function notch_func!(du, u, p, t)
 end
 
 #=======================SIMULATION=======================#
-#-------------------cell density-------------------
-σs = zeros(Ly, Lx)
-σ = Array(collect(0:1:Lx-1))
-a = 1.0
-b = 30.0
-c = 15.0
 
-#non-linear
-for i in 1:Ly
-    #left
-    σs[i, :] .= a*exp.(-((σ.-b).^2)/(2*c*c))
-end
-
-#linear
-#for i in 1:Ly
-#    σs[i, :] = -σ./(Lx+1) .+ 1
-#end
-
-#σs=1.0
-
-
+ν0 = 0.001
+ν1 = 5.0
+ν2 = 1-ν0
+k = 4
+#--------------------------------------------------------------------------
 begin
+    #initial data--------------------------------------------------------
+    u0 = rand(Ly, Lx, 7)*0.1
+    @. u0[:, :, 2] = u0[:, :, 2] + 3.0 #DELTA in cell membrane
+    @. u0[:, :, 6] = u0[:, :, 6] + 3.0 #DELTA in cytosol
+    @. u0[:, :, 4] = u0[:, :, 4] + 0.5 #NICD in cytosol
+
     #timespan, parameters------------------------------------------------
     tspan = (0.0, T_end)
+
+    #cell density--------------------------------------------------------
+    σs = zeros(Ly, Lx)
+    @. σs = ν0 + ν2*(u0[:, :, 5]^k)/(ν1^k+(u0[:, :, 5]^k))
+    σs[:, 2] .= 0.5
 
     cache = (
         n_ave = zeros(Ly,Lx),
@@ -128,47 +130,48 @@ begin
     )
     p = (
         α1=1.0, α2=1.0, μ1=1.0, μ2=1.0, μ3=1.0, μ4=0.01, μ5=1.0, μ6=0.5, μ7=0.5,
-        β1=1.1, β2=20.0, β3=100.0, β4=1.0, β5=1.1, β6=1.0,
-        γ1=2.0, γ2=1.0,γ3=1.0,
-        σs=σs, σv=1.0, cache...
+        β1=1.1, β2=20.0, β3=100.0, β4=1.0, β5=1.1, β6=1.0, 
+        γ1=2.0, γ2=1.0,γ3=1.0, k=k,
+        σs=σs, σv=1.0, ν0=ν0, ν1=ν1, ν2=ν2, cache...
         )
     
-    #initial data--------------------------------------------------------
-    u0 = rand(Ly, Lx, 7)*0.1 #cell number (y), cell number (x), biochemicals
-    @. u0[:, :, 2] = u0[:, :, 2] + 3.0 #DELTA in cell membrane
-    @. u0[:, :, 6] = u0[:, :, 6] + 3.0 #DELTA in cytosol
-    @. u0[:, :, 4] = u0[:, :, 4] + 0.5 #NICD in cytosol
+    
 
     prob = ODEProblem(notch_func!, u0, tspan, p)
 end
 
-#------------------Animation------------------
-function plot_heatmap(u, t, integrator)
+function plot_heatmap(u, t, integrator) #Notch in cytosol
     heatmap(Array(u[:, :, 5]), title="t=$(round(t, digits=1))", c=:inferno, clim=(0, 7))
     frame(anim)
     return nothing
 end
-anim = Animation() #array of image for animation
 
-#--------------callback functions--------------
-cb1 = FunctionCallingCallback(plot_heatmap, funcat = LinRange(0, T_end, 100)) #plot at intervals
+function plot_line(u, t, integrator) #sigma_S
+    plot(x, σs[Int(floor(Ly/2)),:], title="t=$(round(t, digits=1))", ylim=(0, 1))
+    frame(anim2)
+    return nothing
+end
+
+cb1 = FunctionCallingCallback(plot_heatmap, funcat = LinRange(0, T_end, 50)) #plot at intervals
 cb2 = TerminateSteadyState(5e-3) #If all biochemicals in cells reach steady state, terminate the simulation
-cbs = CallbackSet(cb1, cb2)
+cb3 = FunctionCallingCallback(plot_line, funcat = LinRange(0, T_end, 50)) #plot at intervals
+cbs = CallbackSet(cb1, cb2, cb3)
 
+anim = Animation() #array of image for animation
+anim2 = Animation()
+x = Array(0:1:Lx-1)
 
-#-------------------calculation-------------------
+#calculation
 @time sol = solve(prob, Heun(), progress = true, progress_steps = 1.0, saveat=[T_end], callback=cbs);
 #calculation methods: BS3, Tsit5, Heun, ROCK2
 
-#----------------plot and save figure----------------
-#heatmap at t=T_end
-fig1 = heatmap(Array(sol[end][:, :, 5]), title="Notch in cytosol",  c=:inferno, clim=(0, 7))
-fig2 = heatmap(Array(sol[end][:, :, 6]), title="Delta in cytosol",  c=:inferno, clim=(0, 0.1))
+fig1 = heatmap(Array(sol[end][:, :, 5]), title="Notch in cytosol", c=:inferno, clim=(0, 7))
+fig2 = heatmap(Array(sol[end][:, :, 6]), title="Delta in cytosol", c=:inferno, clim=(0, 0.1))
 fig3 = heatmap(Array(sol[end][:, :, 7]), title="Jagged in cytosol", c=:inferno, clim=(0, 0.7))
-
-#save figure
-savefig(fig1, "_notch.png")
-savefig(fig2, "_Delta.png")
-savefig(fig3, "_Jag.png")
-gif(anim,     "_notch.gif", fps=120) #create gif animation
+#fig = plot(x, Array(sol[Int(floor(Ly/2)),:, 4]), ylim=(0, 7))
+savefig(fig1, "1d_NDJ_temp_notch.png")
+savefig(fig2, "1d_NDJ_temp_Delta.png")
+savefig(fig3, "1d_NDJ_temp_Jag.png")
+gif(anim,     "1d_NDJ_temp____Notch.gif", fps=120) #create gif animation
+gif(anim2,    "1d_sigS___.gif", fps=120) #create gif animation
 
